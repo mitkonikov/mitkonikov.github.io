@@ -1,2 +1,3 @@
-# mitkonikov.github.io
-Github pages repository
+# Mitko Nikov
+
+[Traversal Solver Puzzle](/tsp)
