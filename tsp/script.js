@@ -9,12 +9,17 @@ let MOVE_COUNT = 0;
 
 const dx = [-1, 1, 0, 0];
 const dy = [0, 0, -1, 1];
+const op = [1, 0, 3, 2];
+const dc = ['up', 'down', 'left', 'right'];
 
 const SLEEP_BETWEEN = 500;
+const INF = 10000;
 
 let optimal = [];
 let adj_points = [];
-let optimal_score = 10000;
+let box_positions = [];
+let optimal_score = INF;
+let optimal_moves = [];
 
 function getRandomInt(start, end, RNG) {
     let random = Math.abs(RNG.int32());
@@ -52,7 +57,6 @@ function generateState(seed) {
             numberBoxes++;
         }
     }
-    console.log(field);
 }
 
 function createGrid() {
@@ -101,25 +105,30 @@ function sleep(ms) {
 }
 
 function bfs(adj_points, i) {
-    let p1 = adj_points[i];
-    if (!(p1.x >= 0 && p1.y >= 0 && p1.x < HEIGHT && p1.y < WIDTH)) {
-        let result = Array(adj_points.length);
-        for (let i = 0; i < adj_points.length; i++) {
-            result[i] = 10000;
-        }
-        return result;
-    }
-
-    console.log(p1);
-
+    // Initialize all arrays
     let dist = [];
+    let parent = [];
     for (let i = 0; i < HEIGHT; i++) {
         dist[i] = Array(WIDTH);
+        parent[i] = Array(WIDTH);
         for (let j = 0; j < WIDTH; j++) {
-            dist[i][j] = 10000;
+            dist[i][j] = INF;
+            parent[i][j] = -1;
         }
     }
+    
+    let result = Array(adj_points.length);
+    for (let i = 0; i < adj_points.length; i++) {
+        result[i] = INF;
+    }
 
+    // Check if the starting point is valid
+    let p1 = adj_points[i];
+    if (!valid(p1.x, p1.y)) {
+        return { result, parent };
+    }
+
+    // Run the BFS
     dist[p1.x][p1.y] = 0;
     let queue = [];
     let p = 0;
@@ -131,36 +140,34 @@ function bfs(adj_points, i) {
         for (let dir = 0; dir < 4; dir++) {
             let nx = top.x + dx[dir];
             let ny = top.y + dy[dir];
-            if (nx >= 0 && ny >= 0 && nx < HEIGHT && ny < WIDTH) {
-                if (
-                    field[nx][ny] != 2 &&
-                    dist[nx][ny] > dist[top.x][top.y] + 1
-                ) {
+            if (valid(nx, ny) && field[nx][ny] != 2) {
+                if (dist[nx][ny] > dist[top.x][top.y] + 1) {
                     dist[nx][ny] = dist[top.x][top.y] + 1;
+                    parent[nx][ny] = dir;
                     queue.push({ x: nx, y: ny });
                 }
             }
         }
     }
 
-    let result = Array(adj_points.length);
+    // Write down the interesting distances in another array
     for (let i = 0; i < adj_points.length; i++) {
         let x = adj_points[i].x;
         let y = adj_points[i].y;
-        if (x >= 0 && y >= 0 && x < HEIGHT && y < WIDTH) {
+        if (valid(x, y)) {
             result[i] = dist[x][y];
-        } else {
-            result[i] = 10000;
         }
     }
-    return result;
+    return { result, parent };
 }
 
 function TSP() {
     adj_points = [];
+    box_positions = [];
     for (let i = 0; i < WIDTH; i++) {
         for (let j = 0; j < HEIGHT; j++) {
             if (field[i][j] == 2) {
+                box_positions.push({ x: i, y: j });
                 for (let dir = 0; dir < 4; dir++) {
                     let nx = i + dx[dir];
                     let ny = j + dy[dir];
@@ -173,19 +180,22 @@ function TSP() {
     adj_points.push({ x: RX, y: RY });
 
     let dist = [];
-    const INF = 10000;
+    let parents = [];
     let N = 4 * BOXES + 1;
     let M = BOXES + 1;
     for (let i = 0; i < N; i++) {
         dist[i] = Array(N);
+        parents[i] = [];
         for (let j = 0; j < N; j++) {
             if (i == j) dist[i][j] = 0;
             else dist[i][j] = INF;
         }
     }
-
+    
     for (let i = 0; i < N; i++) {
-        dist[i] = bfs(adj_points, i);
+        let bfsResult = bfs(adj_points, i);
+        dist[i] = bfsResult.result;
+        parents[i] = bfsResult.parent;
     }
 
     console.log(dist);
@@ -199,7 +209,7 @@ function TSP() {
         dp[i] = Array(1 << M);
         pr[i] = Array(1 << M);
         for (let j = 0; j < 1 << M; j++) {
-            dp[i][j] = 10000;
+            dp[i][j] = INF;
             pr[i][j] = -1;
         }
     }
@@ -222,6 +232,7 @@ function TSP() {
 
     console.log(dp);
 
+    // Find the best DP
     let bestLast = 0;
     for (let last = 0; last < N; last++) {
         if (dp[last][(1 << M) - 1] < dp[bestLast][(1 << M) - 1]) {
@@ -229,6 +240,7 @@ function TSP() {
         }
     }
 
+    // If optimal score is INF, it means that we cannot solve the state
     optimal_score = dp[bestLast][(1 << M) - 1];
     if (optimal_score == INF) {
         window.location.reload();
@@ -236,6 +248,7 @@ function TSP() {
     
     console.log("best dp: " + optimal_score);
 
+    // Reconstruct the optimal sequence of markings
     optimal = [];
     let p = bestLast;
     let mask = (1 << M) - 1;
@@ -245,6 +258,43 @@ function TSP() {
         p = pr[p][mask];
         mask = mask & ~(1 << (old_p / 4));
     }
+
+    // Reconstruct moves
+    optimal = optimal.reverse();
+    for (let i = 0; i < optimal.length; i++) {
+        if (i == 0) {
+            constructPath({ x: RX, y: RY }, adj_points[optimal[i]], parents[N - 1]);
+        } else {
+            constructPath(adj_points[optimal[i-1]], adj_points[optimal[i]], parents[optimal[i-1]]);
+        }
+        
+        // Figure out on which side we should mark
+        let point = adj_points[optimal[i]];
+        let node = Math.floor(optimal[i] / 4);
+        for (let dir = 0; dir < 4; dir++) {
+            let nx = point.x + dx[dir];
+            let ny = point.y + dy[dir];
+            if (valid(nx, ny) && box_positions[node].x == nx && box_positions[node].y == ny) {
+                optimal_moves.push({ type: "mark", dir });
+                break;
+            }
+        }
+    }
+
+    console.log(optimal_moves);
+}
+
+function constructPath(p1, p2, parents) {
+    let moves = [];
+    while (parents[p2.x][p2.y] != -1) {
+        let dir = parents[p2.x][p2.y];
+        let nx = p2.x + dx[op[dir]];
+        let ny = p2.y + dy[op[dir]];
+        moves.push({ type: "move", dir });
+        p2 = { x: nx, y: ny };
+    }
+    moves = moves.reverse();
+    for (let move of moves) optimal_moves.push(move);
 }
 
 function canMove(x, y) {
@@ -334,7 +384,7 @@ function checkEnd() {
     }
 }
 
-let demoWorkspace;
+let workspace;
 
 window.addEventListener("load", () => {
     createGrid();
@@ -360,7 +410,7 @@ window.addEventListener("load", () => {
         },
     });
 
-    demoWorkspace = Blockly.inject("blocklyDiv", {
+    workspace = Blockly.inject("blocklyDiv", {
         toolbox: document.getElementById("toolbox-categories"),
         theme: "dark",
     });
@@ -368,13 +418,13 @@ window.addEventListener("load", () => {
     defineBlocks();
     defineGenerator();
 
-    // Blockly.serialization.workspaces.load(startBlocks, demoWorkspace);
+    // Blockly.serialization.workspaces.load(startBlocks, workspace);
 });
 
 function showCode() {
     // Generate JavaScript code and display it.
     javascript.javascriptGenerator.INFINITE_LOOP_TRAP = null;
-    var code = javascript.javascriptGenerator.workspaceToCode(demoWorkspace);
+    let code = javascript.javascriptGenerator.workspaceToCode(workspace);
     alert(code);
 }
 
@@ -383,9 +433,9 @@ function runCode() {
     window.LoopTrap = 1000;
     javascript.javascriptGenerator.INFINITE_LOOP_TRAP =
         'if (--window.LoopTrap < 0) throw "Infinite loop.";\n';
-    var code =
+    let code =
         "(async () => {" +
-        javascript.javascriptGenerator.workspaceToCode(demoWorkspace) +
+        javascript.javascriptGenerator.workspaceToCode(workspace) +
         " checkEnd(); })();";
     javascript.javascriptGenerator.INFINITE_LOOP_TRAP = null;
     try {
@@ -416,4 +466,70 @@ function reset() {
         }
     }
     draw(field);
+}
+
+function exportBlockly() {
+    let xml = Blockly.Xml.workspaceToDom(workspace);
+    console.log(xml);
+}
+
+function createForLoop(doc, parent, children, count) {
+    let forBlock = doc.createElement('block');
+    forBlock.setAttribute('type', 'controls_repeat_ext');
+
+    let val = doc.createElement('value');
+    val.setAttribute('name', "TIMES");
+    forBlock.appendChild(val);
+    
+    let shadow = doc.createElement('shadow');
+    shadow.setAttribute('type', 'math_number');
+    val.appendChild(shadow);
+
+    let shadow_field = doc.createElement('field');
+    shadow_field.setAttribute('name', 'NUM');
+    shadow_field.innerHTML = count;
+    shadow.appendChild(shadow_field);
+
+    let statement = doc.createElement('statement');
+    statement.setAttribute('name', 'DO');
+    forBlock.appendChild(statement);
+
+    for (let child of children) {
+        statement.appendChild(child);
+    }
+
+    parent.appendChild(forBlock);
+}
+
+function dfsCreate(doc, i) {
+    if (i >= optimal_moves.length) return null;
+    
+    // Create my block
+    let me = doc.createElement('block');
+    let move = optimal_moves[i];
+    let command = (move.type + "_" + dc[move.dir]);
+    me.setAttribute('type', command);
+
+    let children = dfsCreate(doc, i + 1);
+
+    if (children != null) {
+        let nextBlock = doc.createElement('next');
+        nextBlock.appendChild(children);
+        me.appendChild(nextBlock);
+    }
+
+    return me;
+}
+
+function solveBlockly() {
+    let doc = document.implementation.createDocument("", "", null);
+    let xml = doc.createElement('xml');
+    doc.appendChild(xml);
+
+    let blocks = dfsCreate(doc, 0);
+    xml.appendChild(blocks);
+
+    console.log(doc);
+    let result = Blockly.Xml.domToWorkspace(xml, workspace);
+    console.log(result);
 }
