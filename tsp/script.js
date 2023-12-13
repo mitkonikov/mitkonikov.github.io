@@ -88,12 +88,12 @@ function draw(f) {
             if (i == RX && j == RY) {
                 let robot = document.createElement("div");
                 robot.classList.add("icon");
-                robot.innerHTML = "R";
+                robot.innerHTML = "🤖";
                 cell.appendChild(robot);
             } else if (f[i][j] == 2 || f[i][j] == 3) {
                 let box = document.createElement("div");
                 box.classList.add("icon");
-                box.innerHTML = "B";
+                box.innerHTML = "📦";
                 cell.appendChild(box);
             }
         }
@@ -388,7 +388,9 @@ let workspace;
 
 window.addEventListener("load", () => {
     createGrid();
-    generateState(Math.random());
+    let seed = Math.random();
+    document.getElementById('seed').innerHTML = seed;
+    generateState(seed);
     draw(field);
     TSP();
 
