@@ -1,0 +1,128 @@
+name: Build CV
+
+on:
+  pull_request:
+    paths:
+      - "cv/**"
+      - ".github/workflows/cv.yml"
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-cv:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: cv
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Pandoc and LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pandoc \
+            unzip \
+            texlive-latex-extra \
+            texlive-fonts-extra \
+            texlive-fonts-recommended \
+            texlive-xetex \
+            lmodern
+
+      - name: Install pandoc-latex-environment filter
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandoc-latex-environment
+
+      - name: Download latest Eisvogel template release
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import urllib.request
+
+          api_url = "https://api.github.com/repos/Wandmalfarbe/pandoc-latex-template/releases/latest"
+          with urllib.request.urlopen(api_url) as response:
+              release = json.load(response)
+
+          assets = release.get("assets", [])
+          eisvogel_asset = next(
+              (asset for asset in assets if asset.get("name") == "Eisvogel.zip"),
+              None,
+          )
+
+          if not eisvogel_asset:
+              raise SystemExit("Eisvogel.zip not found in latest release assets")
+
+          pathlib.Path("templates").mkdir(parents=True, exist_ok=True)
+          urllib.request.urlretrieve(eisvogel_asset["browser_download_url"], "templates/Eisvogel.zip")
+          print(f"Downloaded {eisvogel_asset['name']}")
+          PY
+
+      - name: Extract Eisvogel template
+        run: |
+          mkdir -p templates/.eisvogel
+          unzip -o templates/Eisvogel.zip -d templates/.eisvogel
+
+          echo "Searching extracted template files under: $(pwd)/templates/.eisvogel"
+          latex_file=$(find templates/.eisvogel -type f -name 'eisvogel.latex' | head -n 1)
+          beamer_file=$(find templates/.eisvogel -type f -name 'eisvogel.beamer' | head -n 1)
+          background_file=$(find templates/.eisvogel -type f \( -path '*/title-page-custom/background.pdf' -o -name 'background.pdf' \) | head -n 1)
+
+          echo "Found latex file: ${latex_file:-<missing>}"
+          echo "Found beamer file: ${beamer_file:-<missing>}"
+          echo "Found background file: ${background_file:-<missing>}"
+
+          if [[ -z "$latex_file" || -z "$beamer_file" || -z "$background_file" ]]; then
+            echo "Could not find eisvogel template files in archive"
+            echo "Extracted files were:"
+            exit 1
+          fi
+          cp "$latex_file" templates/eisvogel.latex
+          cp "$beamer_file" templates/eisvogel.beamer
+          cp "$background_file" templates/background.pdf
+
+          echo "Copied templates/eisvogel.latex"
+          echo "Copied templates/eisvogel.beamer"
+          echo "Copied templates/background.pdf"
+          ls -l templates/eisvogel.latex templates/eisvogel.beamer templates/background.pdf
+
+          rm -rf templates/.eisvogel templates/Eisvogel.zip
+
+      - name: Build CV PDF
+        run: |
+          pandoc CV_sl.md \
+            -o CV_sl.pdf \
+            --from markdown \
+            --template ./templates/eisvogel.latex \
+            --include-in-header=./patches/header.tex \
+            --filter pandoc-latex-environment
+
+          echo "Generated PDF: $(pwd)/CV_sl.pdf"
+          ls -l CV_sl.pdf
+
+      - name: Upload CV artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CV_sl
+          path: cv/CV_sl.pdf
+
+      - name: Upload CV PDF to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: cv/CV_sl.pdf
