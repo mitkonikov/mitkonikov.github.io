@@ -113,21 +113,36 @@ jobs:
             --filter pandoc-latex-environment
 
           echo "Generated PDF: $(pwd)/CV_sl.pdf"
-          ls -l CV_sl.pdf
+
+          pandoc CV_en.md \
+            -o CV_en.pdf \
+            --from markdown \
+            --template ./templates/eisvogel.latex \
+            --include-in-header=./patches/header.tex \
+            --filter pandoc-latex-environment
+          
+          echo "Generated PDF: $(pwd)/CV_en.pdf"
+          ls -l .
 
       - name: Build attachments PDF
         run: |
           python build_attachments.py
           ls -l attachments.pdf
 
-      - name: Upload CV artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload CV Slovene artifact
+        uses: actions/upload-artifact@v6
         with:
           name: CV_sl
           path: cv/CV_sl.pdf
 
+      - name: Upload CV English artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: CV_en
+          path: cv/CV_en.pdf
+          
       - name: Upload attachments artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: attachments
           path: cv/attachments.pdf
@@ -138,4 +153,5 @@ jobs:
         with:
           files: |
             cv/CV_sl.pdf
+            cv/CV_en.pdf
             cv/attachments.pdf
