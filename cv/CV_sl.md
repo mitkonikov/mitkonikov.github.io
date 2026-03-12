@@ -56,6 +56,7 @@ pandoc-latex-environment:
 
 **Laboratorij GeMMA @ FERI** (06/2022 – danes)  
 
+- Raziskuje in sodeluje pri razvoju napredne umetne inteligence za jezikovne modele v okviru projekta AID HCH.
 - V okviru projekta COMPROMISE je skupaj s profesorjema Damjanom Strnadom in Davidom Podgorelcem objavil članek v reviji MDPI Mathematics. Članek je predstavil prvo matematično definicijo arhitekture FFRNN ter analiziral obrezovanje, redkost in natančnost različnih arhitektur Forward‑Forward na več podatkovnih zbirkah.
 - Razvil je FFLib – odprtokodno razširitveno knjižnico za PyTorch, namenjeno razvoju, testiranju in uporabi nevronskih mrež na osnovi algoritma Forward‑Forward.
 - Razvil je splošno-namenski urejevalnik vozlišč za grafovske cevovode z vzporednim izvajanjem, ki je bil uspešno integriran v GeMMAFusionSuite in se trenutno uporablja v okviru projektov GreenDatAI, PrAEctiCe, PLOTO, CRP-V2-2390 in BLS ALGO.
